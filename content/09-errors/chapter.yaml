@@ -1,0 +1,4 @@
+title: Error Handling
+tier: intermediate
+icon: "⚠️"
+summary: Errors as values, wrapping, errors.Is/As, panics and recover.

@@ -1,0 +1,144 @@
+# Chapter 2 quiz. Question types: single, multi, output, fill, bug.
+passPercent: 70
+questions:
+  - id: package-level-declaration
+    type: single
+    prompt: Which of these is NOT allowed at package level, outside any function?
+    options:
+      - "`var limit = 10`"
+      - "`const Name = \"go\"`"
+      - "`limit := 10`"
+      - "`var ( a = 1; b = 2 )`"
+    answer: 2
+    explanation: >-
+      The short declaration `:=` is only allowed inside functions. At package
+      level every declaration must start with a keyword such as `var` or
+      `const`.
+
+  - id: string-length
+    type: single
+    prompt: Each of the characters in `"日本"` takes 3 bytes in UTF-8. What does `len("日本")` return?
+    options: ["2", "4", "6", "8"]
+    answer: 2
+    explanation: >-
+      `len` on a string counts bytes, not characters: 2 characters times 3
+      bytes is 6. Use `utf8.RuneCountInString` or `len([]rune(s))` to get 2.
+
+  - id: compiles-which
+    type: multi
+    prompt: Which of these declarations compile? Select all that apply.
+    options:
+      - "`var f float64 = 3`"
+      - "`var n int = 2.5`"
+      - "`x := 10; y := float64(x) / 4`"
+      - "`var a int32 = 1; var b int64 = a`"
+    answer: [0, 2]
+    explanation: >-
+      The untyped constant `3` can become a `float64`, and `float64(x)` is an
+      explicit conversion. `2.5` cannot be an `int` (it would be truncated),
+      and `int32` never converts to `int64` implicitly.
+
+  - id: shadowing-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          x := 5
+          if x > 3 {
+              x := x * 2
+              fmt.Println(x)
+          }
+          fmt.Println(x)
+      }
+    answer: |
+      10
+      5
+    explanation: >-
+      Inside the `if`, `x := x * 2` declares a new variable that shadows the
+      outer one, so `10` is printed. After the block, the outer `x` is still
+      `5`.
+
+  - id: conversion-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          a, b := 7, 2
+          f := 3.99
+          c := 257
+          fmt.Println(a/b, float64(a)/float64(b), a%b, int(f), uint8(c))
+      }
+    answer: 3 3.5 1 3 1
+    explanation: >-
+      Integer division gives `3`, the float division gives `3.5`, and `7 % 2`
+      is `1`. `int(3.99)` truncates to `3`, and `uint8(257)` wraps around
+      modulo 256 to `1`.
+
+  - id: iota-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      const (
+          A = iota * 10
+          B
+          _
+          D
+      )
+
+      func main() {
+          fmt.Println(A, B, D)
+      }
+    answer: 0 10 30
+    explanation: >-
+      `iota` is 0, 1, 2, 3 on the four lines and the expression `iota * 10`
+      repeats, giving 0, 10, 20 (discarded by `_`) and 30.
+
+  - id: conversion-fill
+    type: fill
+    prompt: Fill in the gap so that the program prints `3.5`.
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          n := 7
+          avg := ___(n) / 2
+          fmt.Println(avg)
+      }
+    answer: [float64]
+    explanation: >-
+      With `n` an `int`, `n / 2` would be integer division giving `3`.
+      Converting first with `float64(n)` makes the division floating-point,
+      and the untyped constant `2` adapts to `float64`.
+
+  - id: mismatched-types-bug
+    type: bug
+    prompt: This program does not compile. Which line contains the bug?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          count := 3
+          rate := 1.5
+          total := count * rate
+          fmt.Println(total)
+      }
+    answer: 8
+    explanation: >-
+      `count` is an `int` and `rate` is a `float64`. Go has no implicit
+      numeric conversion, so you must write `float64(count) * rate`.

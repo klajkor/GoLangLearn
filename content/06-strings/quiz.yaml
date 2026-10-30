@@ -1,0 +1,150 @@
+passPercent: 70
+questions:
+  - id: len-vs-runes
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "unicode/utf8"
+      )
+
+      func main() {
+          s := "añb"
+          fmt.Println(len(s), utf8.RuneCountInString(s))
+      }
+    answer: 4 3
+    explanation: >-
+      `ñ` is encoded in two bytes in UTF-8, so the string has 4 bytes but
+      only 3 characters (runes).
+
+  - id: string-nature
+    type: single
+    prompt: Which description of a Go `string` is correct?
+    options:
+      - "A mutable array of 16-bit characters"
+      - "An immutable sequence of bytes, usually UTF-8 text"
+      - "A mutable slice of runes"
+      - "A linked list of Unicode characters"
+    answer: 1
+    explanation: >-
+      Strings are immutable byte sequences. Indexing gives bytes, and `range`
+      decodes UTF-8 into runes.
+
+  - id: range-string
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          for i, r := range "hé!" {
+              fmt.Print(i, ":", string(r), " ")
+          }
+          fmt.Println()
+      }
+    answer: "0:h 1:é 3:! "
+    explanation: >-
+      `range` yields the byte offset of each rune. `h` is at 0, `é` at 1
+      takes two bytes, so `!` starts at offset 3.
+
+  - id: strings-funcs
+    type: multi
+    prompt: Which of these expressions evaluate to `true`? Select all that apply.
+    options:
+      - "`strings.Contains(\"gopher\", \"ph\")`"
+      - "`len(strings.Split(\"a,b,,c\", \",\")) == 3`"
+      - "`len(strings.Fields(\" a  b c \")) == 3`"
+      - "`strings.TrimSpace(\"  x \") == \"x\"`"
+    answer: [0, 2, 3]
+    explanation: >-
+      `Split` keeps empty pieces, so `"a,b,,c"` gives four parts, not three.
+      `Fields` splits on runs of whitespace and ignores leading and trailing
+      space, giving three words.
+
+  - id: cut-fill
+    type: fill
+    prompt: Fill the gap so the program prints `host` and `example.com`.
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "strings"
+      )
+
+      func main() {
+          key, val, ok := strings.___("host=example.com", "=")
+          fmt.Println(key, val, ok)
+      }
+    answer: [Cut]
+    explanation: >-
+      `strings.Cut(s, sep)` returns the text before and after the first
+      separator plus a bool saying whether it was found. The program prints
+      `host example.com true`.
+
+  - id: atoi-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "strconv"
+      )
+
+      func main() {
+          a, _ := strconv.Atoi("40")
+          b, err := strconv.Atoi("4x")
+          fmt.Println(a+2, b, err != nil)
+      }
+    answer: 42 0 true
+    explanation: >-
+      `Atoi("40")` succeeds, giving 42 after adding 2. `Atoi("4x")` fails,
+      returning `0` and a non-nil error.
+
+  - id: printf-format
+    type: output
+    prompt: What does this program print? (The brackets show the padding.)
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          fmt.Printf("[%6.2f]\n", 3.14159)
+          fmt.Printf("[%-4d]\n", 7)
+          fmt.Printf("[%q]\n", "hi")
+      }
+    answer: |
+      [  3.14]
+      [7   ]
+      ["hi"]
+    explanation: >-
+      `%6.2f` pads `3.14` to width 6 on the left. `%-4d` left-aligns the
+      number in a field of 4. `%q` wraps the string in double quotes.
+
+  - id: string-index-bug
+    type: bug
+    prompt: >-
+      This program does not compile. Which line contains the bug?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          s := "hello"
+          s[0] = 'H'
+          fmt.Println(s)
+      }
+    answer: 7
+    explanation: >-
+      Strings are immutable, so `s[0] = 'H'` is rejected (`cannot assign to
+      s[0] (neither addressable nor a map index expression)`). Convert to
+      `[]byte` or `[]rune`, modify and convert back.

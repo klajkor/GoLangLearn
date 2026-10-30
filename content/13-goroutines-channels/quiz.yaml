@@ -1,0 +1,164 @@
+passPercent: 70
+questions:
+  - id: main-exits
+    type: single
+    prompt: |
+      What happens to goroutines that are still running when `main` returns?
+    options:
+      - "They keep running until they finish, and then the program exits."
+      - "They are stopped together with the program; their work is lost."
+      - "The runtime panics with a leaked goroutine error."
+      - "They are handed over to the operating system as background threads."
+    answer: 1
+    explanation: >-
+      The program exits when `main` returns, regardless of other goroutines.
+      Use a channel or `sync.WaitGroup` to wait for the work you care about.
+
+  - id: channel-facts
+    type: multi
+    prompt: Which statements about channels are true? Select all that apply.
+    options:
+      - "A send on an unbuffered channel blocks until another goroutine receives."
+      - "Receiving from a closed channel blocks forever."
+      - "Sending on a closed channel causes a panic."
+      - "A receive-only channel (`<-chan T`) cannot be closed."
+    answer: [0, 2, 3]
+    explanation: >-
+      Unbuffered sends wait for a receiver. Sending on a closed channel panics.
+      Closing is a sender-side action, so the compiler rejects `close` on a
+      receive-only channel. Receiving from a closed channel never blocks: it
+      returns buffered values first and then zero values.
+
+  - id: buffered-close-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          ch := make(chan int, 3)
+          ch <- 1
+          ch <- 2
+          fmt.Println(len(ch), cap(ch))
+          close(ch)
+          for v := range ch {
+              fmt.Println(v)
+          }
+          v, ok := <-ch
+          fmt.Println(v, ok)
+      }
+    answer: |
+      2 3
+      1
+      2
+      0 false
+    explanation: >-
+      The buffer holds two of three slots, so `len` is 2 and `cap` is 3. After
+      `close`, `range` still delivers the two buffered values and then stops.
+      A further receive returns the zero value with `ok` set to `false`.
+
+  - id: loopvar-output
+    type: output
+    prompt: |
+      This module declares `go 1.22` or newer. What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          var fns []func() int
+          for i := 0; i < 3; i++ {
+              fns = append(fns, func() int { return i * 10 })
+          }
+          for _, f := range fns {
+              fmt.Print(f(), " ")
+          }
+          fmt.Println()
+      }
+    answer: 0 10 20
+    explanation: >-
+      Since Go 1.22 every iteration gets its own copy of `i`, so each closure
+      remembers a different value. With the old shared-variable semantics all
+      three closures would have returned `30`.
+
+  - id: direction-fill
+    type: fill
+    prompt: Fill in the gaps so the program prints `6`.
+    code: |
+      package main
+
+      import "fmt"
+
+      func produce(out chan<- int) {
+          for i := 1; i <= 3; i++ {
+              out <- i
+          }
+          ___(out)
+      }
+
+      func main() {
+          ch := make(___ int)
+          go produce(ch)
+          sum := 0
+          for v := range ch {
+              sum += v
+          }
+          fmt.Println(sum)
+      }
+    answer: ["close", "chan"]
+    explanation: >-
+      The producer must `close` the channel so that the `range` loop in `main`
+      ends. A channel is created with `make(chan int)`.
+
+  - id: unbuffered-deadlock-bug
+    type: bug
+    prompt: This program crashes with "all goroutines are asleep - deadlock!". Which line is the problem?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          ch := make(chan int)
+          ch <- 42
+          fmt.Println(<-ch)
+      }
+    answer: 7
+    explanation: >-
+      An unbuffered send blocks until some other goroutine receives, but the
+      only goroutine is `main` itself, which would receive on the next line.
+      Send from a separate goroutine (`go func() { ch <- 42 }()`) or use a
+      buffered channel.
+
+  - id: nil-channel
+    type: single
+    prompt: |
+      What happens when you receive from a channel declared as `var ch chan int` (never created with `make`)?
+    options:
+      - "It returns `0` immediately."
+      - "It panics with a nil pointer dereference."
+      - "It blocks forever."
+      - "It does not compile."
+    answer: 2
+    explanation: >-
+      Send and receive on a `nil` channel block forever. (Only `close` of a
+      nil channel panics.) If nothing else can run, the runtime reports a
+      deadlock; otherwise the goroutine just hangs.
+
+  - id: leak-cause
+    type: single
+    prompt: |
+      A function starts 10 goroutines that each send one result on an unbuffered channel, then returns after receiving only the first result. What is the consequence?
+    options:
+      - "Nine goroutines are blocked on their send forever: a goroutine leak."
+      - "The program panics because the channel is never closed."
+      - "The remaining sends are silently dropped and the goroutines exit."
+      - "The compiler reports unused sends."
+    answer: 0
+    explanation: >-
+      With no receiver, each remaining send waits indefinitely, so those
+      goroutines never finish. Buffer the channel (`make(chan T, 10)`) or add
+      cancellation so the senders can stop.

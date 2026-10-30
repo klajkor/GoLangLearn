@@ -1,0 +1,184 @@
+passPercent: 70
+questions:
+  - id: tilde-need
+    type: single
+    prompt: |
+      Given `type Celsius float64` and `func Sum[T int | float64](xs []T) T`, why does `Sum([]Celsius{1.5})` not compile?
+    options:
+      - "`Celsius` is a distinct named type, so it is not literally `float64`; the constraint needs `~float64`."
+      - "Type inference cannot work with named types."
+      - "Generic functions cannot take slices."
+      - "`float64` is not allowed in a type set."
+    answer: 0
+    explanation: >-
+      A union without `~` lists exact types. `Celsius` has underlying type
+      `float64` but is a different type. Writing `~float64` accepts every type
+      whose underlying type is `float64`.
+
+  - id: generics-facts
+    type: multi
+    prompt: Which statements are true? Select all that apply.
+    options:
+      - "`Stack[int]` and `Stack[string]` are distinct types."
+      - "A method of a generic type may declare its own extra type parameters."
+      - "`var zero T` yields the zero value of the type parameter `T`."
+      - "With the constraint `any` you can compare two values of type `T` using `==`."
+    answer: [0, 2]
+    explanation: >-
+      Each instantiation is its own type, and `var zero T` is the standard way
+      to get a zero value. Methods cannot add type parameters (use a generic
+      function), and `==` needs the `comparable` constraint.
+
+  - id: map-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "strings"
+      )
+
+      func Map[T, U any](xs []T, f func(T) U) []U {
+          out := make([]U, 0, len(xs))
+          for _, x := range xs {
+              out = append(out, f(x))
+          }
+          return out
+      }
+
+      func main() {
+          r := Map([]int{1, 2, 3}, func(n int) string {
+              return strings.Repeat("x", n)
+          })
+          fmt.Println(r, len(r))
+      }
+    answer: "[x xx xxx] 3"
+    explanation: >-
+      `T` is inferred as `int` and `U` as `string`. Each number becomes that
+      many `x` characters, giving a `[]string` of length 3, which `Println`
+      shows in brackets separated by spaces.
+
+  - id: zero-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func First[T any](xs []T) T {
+          var zero T
+          if len(xs) == 0 {
+              return zero
+          }
+          return xs[0]
+      }
+
+      func main() {
+          fmt.Printf("%q %d %v\n",
+              First([]string{}),
+              First([]int{7, 8}),
+              First([]*int{}) == nil)
+      }
+    answer: '"" 7 true'
+    explanation: >-
+      For an empty `[]string` the zero value is the empty string, printed with
+      `%q` as `""`. The `[]int` gives its first element `7`. The zero value of
+      `*int` is `nil`, so the comparison is `true`.
+
+  - id: constraint-fill
+    type: fill
+    prompt: Fill in the gaps so the program prints `9 3` (the constraint must accept the named type `ID`).
+    code: |
+      package main
+
+      import (
+          "cmp"
+          "fmt"
+      )
+
+      type ID int
+
+      type Integer interface {
+          ___int | ~int64
+      }
+
+      func Max[T ___.Ordered](a, b T) T {
+          if a > b {
+              return a
+          }
+          return b
+      }
+
+      func Sum[T Integer](xs []T) T {
+          var total T
+          for _, x := range xs {
+              total += x
+          }
+          return total
+      }
+
+      func main() {
+          fmt.Println(Max(ID(3), ID(9)), Sum([]ID{1, 2}))
+      }
+    answer: ["~", "cmp"]
+    explanation: >-
+      `~int` includes defined types such as `ID` whose underlying type is
+      `int`. `cmp.Ordered` is the standard constraint for types that support
+      `<` and `>`.
+
+  - id: method-type-param-bug
+    type: bug
+    prompt: This program does not compile. Which line contains the problem?
+    code: |
+      package main
+
+      import "fmt"
+
+      type Box[T any] struct{ v T }
+
+      func (b Box[T]) Map[U any](f func(T) U) Box[U] {
+          return Box[U]{v: f(b.v)}
+      }
+
+      func main() {
+          b := Box[int]{v: 2}
+          fmt.Println(b)
+      }
+    answer: 7
+    explanation: >-
+      Methods cannot declare type parameters of their own; only the receiver's
+      parameters (`T`) are available. Write a generic function instead:
+      `func MapBox[T, U any](b Box[T], f func(T) U) Box[U]`.
+
+  - id: interface-vs-generic
+    type: single
+    prompt: A function only needs to call `Write` on its argument to send bytes somewhere. What is the idiomatic design?
+    options:
+      - "Accept an `io.Writer` interface; the function is about behaviour."
+      - "Declare `func Send[T any](w T)` and type-switch on `T`."
+      - "Declare `func Send[T comparable](w T)`."
+      - "Accept `any` and use reflection to find a `Write` method."
+    answer: 0
+    explanation: >-
+      Interfaces abstract behaviour. Generics are for containers and algorithms
+      that do the same thing for every element type. A type switch inside a
+      generic function, or reflection, are signs that an interface was the
+      right tool.
+
+  - id: constraint-facts
+    type: multi
+    prompt: Which statements about constraints are true? Select all that apply.
+    options:
+      - "`~int` includes `type Score int`."
+      - "`var x int | string` is a valid variable declaration."
+      - "`cmp.Ordered` permits using `<` on values of type `T`."
+      - "A constraint interface can combine a type list with methods."
+    answer: [0, 2, 3]
+    explanation: >-
+      A union such as `int | string` can only be used as a constraint, not as
+      the type of a variable. The other three statements are correct: `~`
+      matches by underlying type, `cmp.Ordered` covers ordered types, and
+      constraints may list both types and methods.

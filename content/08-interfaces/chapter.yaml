@@ -1,0 +1,4 @@
+title: Interfaces
+tier: intermediate
+icon: "🔌"
+summary: Implicit interfaces, type assertions, type switches and small-interface design.

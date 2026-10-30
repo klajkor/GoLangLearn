@@ -1,0 +1,8 @@
+# Learner progress (local only)
+data/
+
+# Build output
+golearn.exe
+web/node_modules/
+web/dist/*
+!web/dist/.gitkeep

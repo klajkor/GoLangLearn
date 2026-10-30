@@ -1,0 +1,161 @@
+# Chapter 3 quiz. Question types: single, multi, output, fill, bug.
+passPercent: 70
+questions:
+  - id: loop-forms
+    type: single
+    prompt: Which of these is NOT valid Go?
+    options:
+      - "`for i := 0; i < 3; i++ { }`"
+      - "`for x < 10 { }`"
+      - "`while x < 10 { }`"
+      - "`for { break }`"
+    answer: 2
+    explanation: >-
+      Go has no `while` keyword. The condition-only form `for x < 10 { }` plays
+      that role, and `for { }` is the infinite loop.
+
+  - id: break-in-switch
+    type: single
+    prompt: A `switch` sits inside a `for` loop, and one case runs a plain `break`. What happens?
+    options:
+      - The loop ends immediately
+      - Only the `switch` ends; the loop continues with its next iteration step
+      - It is a compile error, because `break` is not allowed in a `switch`
+      - The program panics
+    answer: 1
+    explanation: >-
+      `break` leaves the innermost `for`, `switch` or `select`. To leave the
+      surrounding loop from inside a switch, label the loop and use
+      `break label`.
+
+  - id: if-facts
+    type: multi
+    prompt: Which statements about `if` in Go are true? Select all that apply.
+    options:
+      - "Variables declared in its init statement are visible in its `else` branches"
+      - "The condition must be wrapped in parentheses"
+      - "The condition must have type `bool`"
+      - "Braces may be omitted for a single-statement body"
+    answer: [0, 2]
+    explanation: >-
+      Parentheses are optional (and `gofmt` removes them) and braces are
+      always required. The init-statement scope covers the whole `if`/`else`
+      chain, and non-bool conditions are rejected.
+
+  - id: defer-order-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          for i := 0; i < 3; i++ {
+              defer fmt.Print(i, " ")
+          }
+          fmt.Println("done")
+      }
+    answer: |
+      done
+      2 1 0
+    explanation: >-
+      `Println("done")` runs first. The deferred calls run when `main` returns,
+      in last-in-first-out order, and each captured its own value of `i` when
+      the `defer` statement executed.
+
+  - id: fallthrough-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          switch x := 5; {
+          case x > 3:
+              fmt.Print("a ")
+              fallthrough
+          case x > 10:
+              fmt.Print("b ")
+          case x > 100:
+              fmt.Print("c ")
+          default:
+              fmt.Print("d ")
+          }
+          fmt.Println()
+      }
+    answer: a b
+    explanation: >-
+      The first case matches and prints `a`. `fallthrough` then enters the next
+      case body without testing `x > 10`, which prints `b`. Nothing after that
+      runs, because cases do not fall through by default.
+
+  - id: labeled-loop-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          count := 0
+      outer:
+          for i := 0; i < 3; i++ {
+              for j := 0; j < 3; j++ {
+                  if j == 2 {
+                      continue outer
+                  }
+                  if i == 2 {
+                      break outer
+                  }
+                  count++
+              }
+          }
+          fmt.Println(count)
+      }
+    answer: "4"
+    explanation: >-
+      For `i` = 0 and `i` = 1 the inner loop counts at `j` = 0 and `j` = 1,
+      then `continue outer` moves on at `j` = 2: that is 4 increments. At
+      `i` = 2 the very first inner iteration hits `break outer` before
+      counting.
+
+  - id: defer-fill
+    type: fill
+    prompt: Fill in the gap so the program prints `hi` and then `bye`.
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          bye := func() { fmt.Println("bye") }
+          ___ bye()
+          fmt.Println("hi")
+      }
+    answer: [defer]
+    explanation: >-
+      `defer` postpones the call until `main` returns, so `hi` is printed
+      first and `bye` afterwards.
+
+  - id: assignment-in-if-bug
+    type: bug
+    prompt: This program does not compile. Which line contains the bug?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          x := 3
+          if x = 3 {
+              fmt.Println("three")
+          }
+      }
+    answer: 7
+    explanation: >-
+      `x = 3` is an assignment statement, not an expression, and it is not a
+      `bool`. Use the comparison `x == 3`.

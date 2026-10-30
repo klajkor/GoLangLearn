@@ -1,0 +1,174 @@
+passPercent: 70
+questions:
+  - id: implicit-satisfaction
+    type: single
+    prompt: How does a Go type declare that it implements an interface?
+    options:
+      - With an `implements` keyword after the type name.
+      - By embedding the interface type in the struct.
+      - It does not declare anything; having all the interface's methods is enough.
+      - By registering it with a call to `interface.Register`.
+    answer: 2
+    explanation: >-
+      Interface satisfaction is implicit and checked by the compiler. If the
+      type's method set contains every method of the interface, it implements
+      it. Embedding an interface in a struct is possible, but that is a
+      different thing (it adds a field and promotes the methods).
+
+  - id: assertion-facts
+    type: multi
+    prompt: Which statements about type assertions are true? Select all that apply.
+    options:
+      - "`v, ok := x.(T)` does not panic when `x` does not hold a `T`."
+      - "`v := x.(T)` panics when `x` does not hold a `T`."
+      - "`x.(T)` can be used on any variable, such as an `int`."
+      - "`x.(SomeInterface)` checks whether the dynamic value has the interface's methods."
+    answer: [0, 1, 3]
+    explanation: >-
+      The comma-ok form returns the zero value and `false` on mismatch; the
+      single-value form panics. You can assert to an interface type to test
+      for optional capabilities. Assertions require `x` itself to be of an
+      interface type; on an `int` they are a compile error.
+
+  - id: nil-interface-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      type E struct{}
+
+      func (*E) Error() string { return "e" }
+
+      func f() error {
+          var e *E
+          return e
+      }
+
+      func main() {
+          err := f()
+          fmt.Println(err == nil)
+
+          var e2 *E
+          fmt.Println(e2 == nil)
+      }
+    answer: |
+      false
+      true
+    explanation: >-
+      `f` returns an `error` interface holding the dynamic type `*E` with a
+      nil pointer value. An interface is only nil when both type and value are
+      nil, so `err == nil` is `false`. The plain `*E` variable `e2` really is
+      nil.
+
+  - id: type-switch-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func kind(v any) string {
+          switch x := v.(type) {
+          case int:
+              return "int"
+          case string:
+              return "string:" + x
+          case nil:
+              return "nil"
+          default:
+              return "other"
+          }
+      }
+
+      func main() {
+          fmt.Println(kind(1), kind("a"), kind(nil), kind(2.5))
+      }
+    answer: int string:a nil other
+    explanation: >-
+      `1` is an `int`, `"a"` is a `string` (so `x` is a string in that case),
+      `nil` matches `case nil`, and the untyped constant `2.5` becomes a
+      `float64`, which falls through to `default`.
+
+  - id: compile-time-assertion
+    type: fill
+    prompt: Fill in the gaps with a compile-time check that `*Circle` implements `Shape`.
+    code: |
+      package main
+
+      import "fmt"
+
+      type Shape interface{ Area() float64 }
+
+      type Circle struct{ R float64 }
+
+      func (c *Circle) Area() float64 { return 3 * c.R * c.R }
+
+      var ___ Shape = (___)(nil)
+
+      func main() {
+          fmt.Println((&Circle{R: 2}).Area())
+      }
+    answer: ["_", "*Circle"]
+    explanation: >-
+      `var _ Shape = (*Circle)(nil)` assigns a typed nil pointer to the blank
+      identifier. It allocates nothing at run time, but the compiler verifies
+      that `*Circle` satisfies `Shape`, failing the build if a method is
+      removed or renamed.
+
+  - id: pointer-receiver-iface-bug
+    type: bug
+    prompt: This program does not compile. Which line contains the bug?
+    code: |
+      package main
+
+      import "fmt"
+
+      type Speaker interface{ Speak() string }
+
+      type Dog struct{}
+
+      func (d *Dog) Speak() string { return "woof" }
+
+      func main() {
+          var s Speaker = Dog{}
+          fmt.Println(s.Speak())
+      }
+    answer: 12
+    explanation: >-
+      `Speak` has a pointer receiver, so only `*Dog` is in the interface's
+      method set. `Dog{}` does not implement `Speaker`; use `&Dog{}`. The
+      compiler reports `method Speak has pointer receiver`.
+
+  - id: accept-interfaces
+    type: single
+    prompt: Which function signature best follows "accept interfaces, return structs"?
+    options:
+      - "`func Load(f *os.File) Reader`"
+      - "`func Load(r io.Reader) (*Config, error)`"
+      - "`func Load(path string) io.Reader`"
+      - "`func Load(r io.Reader) any`"
+    answer: 1
+    explanation: >-
+      It takes the smallest interface that does the job (`io.Reader`, so files,
+      strings and network bodies all work and tests are easy) and returns a
+      concrete `*Config`, giving callers its full API. The other options
+      either demand a concrete input or return an abstraction for no reason.
+
+  - id: interface-value-facts
+    type: multi
+    prompt: Which statements about interface values are true? Select all that apply.
+    options:
+      - "An interface value holds a dynamic type and a dynamic value."
+      - "An interface variable holding a nil `*T` pointer compares equal to `nil`."
+      - "Calling a method on a nil interface value panics."
+      - "A larger interface that embeds a smaller one can be assigned to a variable of the smaller interface type."
+    answer: [0, 2, 3]
+    explanation: >-
+      An interface is a (type, value) pair. A nil `*T` stored in an interface
+      gives a non-nil interface, because the type part is set. A nil interface
+      has no type, so calling a method on it panics. Any value of the larger
+      interface has the smaller one's methods, so the assignment is allowed.

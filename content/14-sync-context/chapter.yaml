@@ -1,0 +1,4 @@
+title: sync, select & context
+tier: advanced
+icon: "🚦"
+summary: Mutexes, WaitGroups, select and cancellation with context.

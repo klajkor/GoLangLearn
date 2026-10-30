@@ -1,0 +1,172 @@
+passPercent: 70
+questions:
+  - id: func-syntax
+    type: single
+    prompt: Which declaration is a valid Go function that takes two ints and returns their sum?
+    options:
+      - "func add(int a, int b) int { return a + b }"
+      - "func add(a, b int) int { return a + b }"
+      - "int add(a, b int) { return a + b }"
+      - "func add(a, b) -> int { return a + b }"
+    answer: 1
+    explanation: >-
+      Go writes the name before the type, and neighbouring parameters of the
+      same type can share it: `a, b int`. The result type follows the
+      parameter list.
+
+  - id: pass-by-value
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func bump(n int) int {
+          n++
+          return n
+      }
+
+      func main() {
+          x := 5
+          bump(x)
+          y := bump(x)
+          fmt.Println(x, y)
+      }
+    answer: 5 6
+    explanation: >-
+      Arguments are copied, so `bump` never changes `x`. The first call's
+      result is discarded; the second is stored in `y`, which is 6.
+
+  - id: multi-return-fill
+    type: fill
+    prompt: Complete the program so it prints `3 2`.
+    code: |
+      package main
+
+      import "fmt"
+
+      func divmod(a, b int) (int, int) {
+          return a / b, a % b
+      }
+
+      func main() {
+          q, ___ := divmod(17, 5)
+          fmt.Println(q, r)
+      }
+    answer: [r]
+    explanation: >-
+      `divmod(17, 5)` returns `3` and `2`. Both results must be received, so
+      the second variable is `r`, which is printed afterwards.
+
+  - id: variadic-facts
+    type: multi
+    prompt: Which statements about `func f(prefix string, nums ...int)` are true?
+    options:
+      - "Inside `f`, `nums` has type `[]int`."
+      - "`f(\"a\")` is a valid call."
+      - "`f(\"a\", []int{1, 2})` is a valid call."
+      - "`f(\"a\", []int{1, 2}...)` is a valid call."
+    answer: [0, 1, 3]
+    explanation: >-
+      A variadic parameter is a slice inside the function, and it may receive
+      zero arguments. To pass an existing slice you must spread it with
+      `...`; passing `[]int{1, 2}` as a single argument is a type error.
+
+  - id: closure-counter
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func counter() func() int {
+          n := 0
+          return func() int {
+              n += 2
+              return n
+          }
+      }
+
+      func main() {
+          a := counter()
+          b := counter()
+          a()
+          a()
+          fmt.Println(a(), b())
+      }
+    answer: 6 2
+    explanation: >-
+      Each call to `counter` creates its own `n`. `a` is called three times
+      (2, 4, 6) and `b` once (2), so the last line prints `6 2`.
+
+  - id: loop-closure-122
+    type: output
+    prompt: >-
+      Assuming Go 1.22 or newer, what does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          var fs []func() int
+          for i := 1; i <= 3; i++ {
+              fs = append(fs, func() int { return i * 10 })
+          }
+          for _, f := range fs {
+              fmt.Print(f(), " ")
+          }
+          fmt.Println()
+      }
+    answer: 10 20 30
+    explanation: >-
+      Since Go 1.22 each iteration has its own copy of `i`, so each closure
+      remembers a different value. Before 1.22 this printed `40 40 40`.
+
+  - id: defer-order
+    type: single
+    prompt: What order does this print its lines in?
+    code: |
+      func main() {
+          for i := 0; i < 3; i++ {
+              defer fmt.Println(i)
+          }
+          fmt.Println("end")
+      }
+    options:
+      - "end, 0, 1, 2"
+      - "0, 1, 2, end"
+      - "end, 2, 1, 0"
+      - "2, 1, 0, end"
+    answer: 2
+    explanation: >-
+      The body prints `end` first. Deferred calls then run last-in first-out,
+      and each captured its own `i` at the time of the `defer` statement, so
+      you see `2`, `1`, `0`.
+
+  - id: missing-return-bug
+    type: bug
+    prompt: This program does not compile. Which line contains the bug?
+    code: |
+      package main
+
+      import "fmt"
+
+      func sign(n int) string {
+          if n < 0 {
+              return "negative"
+          } else if n > 0 {
+              return "positive"
+          }
+      }
+
+      func main() {
+          fmt.Println(sign(3))
+      }
+    answer: 11
+    explanation: >-
+      When `n == 0` neither branch returns, so the function can reach its
+      closing brace without a result. The compiler reports `missing return`
+      at the final `}` on line 11. Adding `return "zero"` fixes it.

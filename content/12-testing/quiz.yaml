@@ -1,0 +1,154 @@
+passPercent: 70
+questions:
+  - id: test-func-signature
+    type: single
+    prompt: Which declaration is recognised by `go test` as a unit test?
+    options:
+      - "`func testAdd(t *testing.T)`"
+      - "`func TestAdd(t testing.T)`"
+      - "`func TestAdd(t *testing.T)`"
+      - "`func Testadd(t *testing.T)`"
+    answer: 2
+    explanation: >-
+      A test is named `Test` followed by a non-lower-case character and takes
+      a `*testing.T`. `testAdd` and `Testadd` do not match the naming rule,
+      and `testing.T` without the pointer has the wrong signature.
+
+  - id: go-test-commands
+    type: multi
+    prompt: Which statements about running tests and benchmarks are correct? Select all that apply.
+    options:
+      - "`go test` runs benchmarks by default"
+      - "`go test -bench=.` runs all benchmarks"
+      - "`go test -benchmem` adds `B/op` and `allocs/op` to benchmark results"
+      - "`go test -run TestAbs` limits which tests run, using a regular expression"
+    answer: [1, 2, 3]
+    explanation: >-
+      Benchmarks need `-bench` (a regexp, `.` for all). `-benchmem` reports
+      allocations and `-run` filters tests by regexp. Plain `go test` does
+      not run benchmarks.
+
+  - id: closure-per-iteration
+    type: output
+    prompt: >-
+      The module declares `go 1.22`. What does this table-style loop print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          tests := []struct{ name string }{{"a"}, {"b"}, {"c"}}
+
+          var runs []func()
+          for _, tt := range tests {
+              runs = append(runs, func() { fmt.Print(tt.name, " ") })
+          }
+          for _, run := range runs {
+              run()
+          }
+          fmt.Println()
+      }
+    answer: "a b c"
+    explanation: >-
+      Since Go 1.22 every iteration has its own `tt`, so each closure
+      captures a different value. This is why parallel subtests no longer
+      need the old `tt := tt` line. Before 1.22 the output was `c c c`.
+
+  - id: subtest-fill
+    type: fill
+    prompt: Fill in the gaps to run each case as a subtest and report a failure while letting the test continue.
+    code: |
+      package main
+
+      import "testing"
+
+      func Double(n int) int { return n * 2 }
+
+      func TestDouble(t *testing.T) {
+          tests := []struct {
+              name     string
+              in, want int
+          }{{"two", 2, 4}, {"zero", 0, 0}}
+
+          for _, tt := range tests {
+              t.___(tt.name, func(t *testing.T) {
+                  if got := Double(tt.in); got != tt.want {
+                      t.___("Double(%d) = %d, want %d", tt.in, got, tt.want)
+                  }
+              })
+          }
+      }
+
+      func main() {}
+    answer:
+      - Run
+      - Errorf
+    explanation: >-
+      `t.Run(name, func)` creates a subtest, and `t.Errorf` marks it failed
+      but keeps executing (`Fatalf` would stop that subtest immediately).
+
+  - id: benchmark-loop-bug
+    type: bug
+    prompt: This benchmark gives meaningless results. Which line is the bug?
+    code: |
+      package strx
+
+      import "testing"
+
+      func BenchmarkUpper(b *testing.B) {
+          for i := 0; i < 1000; i++ {
+              _ = Upper("gopher")
+          }
+      }
+    answer: 6
+    explanation: >-
+      A benchmark must run the code `b.N` times (or use `for b.Loop()` in Go
+      1.24+) because the framework adjusts `b.N` until timing is stable. A
+      fixed count makes `ns/op` wrong.
+
+  - id: fuzz-failure-storage
+    type: single
+    prompt: >-
+      `go test -fuzz=FuzzParse` finds an input that makes the code fail. What
+      happens to that input?
+    options:
+      - "It is printed and then forgotten"
+      - "It is saved under `testdata/fuzz/FuzzParse/` and replayed by plain `go test`"
+      - "It is written to `go.sum`"
+      - "It is stored in the build cache and never shown"
+    answer: 1
+    explanation: >-
+      The failing input is written as a file in the package's
+      `testdata/fuzz/<FuzzName>/` directory. A normal `go test` runs those
+      files as regression cases, so you should commit them.
+
+  - id: example-output
+    type: single
+    prompt: >-
+      What does `go test` do with a function `ExampleHello()` that has no
+      `// Output:` comment?
+    options:
+      - "Runs it and passes if it does not panic"
+      - "Compiles it but does not run it"
+      - "Ignores the file completely"
+      - "Fails, because examples must declare output"
+    answer: 1
+    explanation: >-
+      Examples without an output comment are compiled (so they stay valid
+      code in the docs) but not executed. With an `// Output:` comment, the
+      test runner compares the printed text with the comment.
+
+  - id: helper-purpose
+    type: single
+    prompt: What does calling `t.Helper()` at the top of an assertion function do?
+    options:
+      - "Runs the function in parallel with other tests"
+      - "Makes failures be reported at the caller's line instead of inside the helper"
+      - "Automatically deletes temporary files at the end of the test"
+      - "Turns the helper into a subtest"
+    answer: 1
+    explanation: >-
+      `t.Helper()` marks the function as a test helper so log and failure
+      positions skip it and point to the line in the test that called it.
+      Cleanup is `t.Cleanup`, parallelism is `t.Parallel`.

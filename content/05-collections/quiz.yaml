@@ -1,0 +1,151 @@
+passPercent: 70
+questions:
+  - id: array-copy
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          a := [3]int{1, 2, 3}
+          b := a
+          b[0] = 9
+          fmt.Println(a[0], b[0])
+      }
+    answer: 1 9
+    explanation: >-
+      Arrays are values, so `b := a` copies all three elements. Changing `b`
+      does not affect `a`.
+
+  - id: len-cap
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          s := make([]int, 2, 5)
+          t := s[1:4]
+          fmt.Println(len(s), cap(s), len(t), cap(t))
+      }
+    answer: 2 5 3 4
+    explanation: >-
+      `s` has length 2 and capacity 5. `t = s[1:4]` has length 4-1 = 3 and its
+      capacity runs from index 1 to the end of the array: 5-1 = 4.
+
+  - id: append-result
+    type: bug
+    prompt: >-
+      This program is meant to print `[1 2 3]` but does not compile. Which
+      line is the bug?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          s := []int{1, 2}
+          append(s, 3)
+          fmt.Println(s)
+      }
+    answer: 7
+    explanation: >-
+      `append` returns the new slice and the result must be used. The
+      compiler rejects the line with `append(s, 3) (value of type []int) is
+      not used`; the fix is `s = append(s, 3)`.
+
+  - id: shared-backing
+    type: single
+    prompt: >-
+      After `s := []int{1, 2, 3, 4}` and `t := s[:2]`, you run `t = append(t, 99)`.
+      What is `s` now?
+    options:
+      - "[1 2 3 4]"
+      - "[1 2 99 4]"
+      - "[1 2 99]"
+      - "[99 2 3 4]"
+    answer: 1
+    explanation: >-
+      `t` has length 2 but capacity 4, so `append` writes into the shared
+      array at index 2 and overwrites the `3`. To prevent this, use the full
+      slice expression `s[:2:2]` or copy.
+
+  - id: slice-facts
+    type: multi
+    prompt: Which statements about slices are true? Select all that apply.
+    options:
+      - "A nil slice and an empty slice both have length 0."
+      - "You can `append` to a nil slice."
+      - "`copy(dst, src)` grows `dst` if it is too short."
+      - "Two slices made by slicing the same array can share memory."
+    answer: [0, 1, 3]
+    explanation: >-
+      Nil and empty slices both have `len` 0 and both accept `append`. `copy`
+      never grows the destination; it copies `min(len(dst), len(src))`
+      elements. Slices of the same array share its storage.
+
+  - id: comma-ok-fill
+    type: fill
+    prompt: >-
+      Fill the gaps so the program prints `missing` for a key that is not in
+      the map.
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          m := map[string]int{"a": 0}
+          if _, ___ := m["b"]; !ok {
+              fmt.Println("missing")
+          }
+      }
+    answer: [ok]
+    explanation: >-
+      The two-value lookup `v, ok := m[k]` reports whether the key exists.
+      Here the declared name must be `ok` to match the `!ok` condition.
+
+  - id: nil-map-write
+    type: single
+    prompt: What happens when this code runs?
+    code: |
+      var m map[string]int
+      m["x"] = 1
+    options:
+      - "It compiles and runs, creating the map automatically"
+      - "It fails to compile"
+      - "It panics at run time"
+      - "It silently does nothing"
+    answer: 2
+    explanation: >-
+      A nil map can be read, but writing panics with `assignment to entry in
+      nil map`. Create the map first with `make` or a literal.
+
+  - id: map-of-slices
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "maps"
+          "slices"
+      )
+
+      func main() {
+          g := map[bool][]int{}
+          for i := 1; i <= 5; i++ {
+              g[i%2 == 0] = append(g[i%2 == 0], i)
+          }
+          fmt.Println(slices.Sorted(maps.Keys(map[string]int{"b": 1, "a": 2})), g[true], g[false])
+      }
+    answer: "[a b] [2 4] [1 3 5]"
+    explanation: >-
+      A missing key yields a nil slice, so `append` works directly. Even
+      numbers go under `true`, odd under `false`. `slices.Sorted` over the
+      keys gives `[a b]` regardless of map order.

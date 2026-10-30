@@ -1,0 +1,153 @@
+passPercent: 70
+questions:
+  - id: nil-deref
+    type: single
+    prompt: What happens when this code runs?
+    options:
+      - "It prints `0`"
+      - "It prints `<nil>`"
+      - "It panics with a nil pointer dereference"
+      - "It does not compile"
+    code: |
+      var p *int
+      fmt.Println(*p)
+    answer: 2
+    explanation: >-
+      The zero value of a pointer is `nil`. Reading through a nil pointer
+      is a run-time panic: `invalid memory address or nil pointer
+      dereference`. The code compiles fine.
+
+  - id: pointer-facts
+    type: multi
+    prompt: Which statements about Go pointers are true? Select all that apply.
+    options:
+      - "You can do arithmetic such as `p++` on a pointer"
+      - "`new(int)` returns a `*int` pointing at `0`"
+      - "Returning the address of a local variable is safe"
+      - "`p.Name` works when `p` is a pointer to a struct"
+    answer: [1, 2, 3]
+    explanation: >-
+      Go has no pointer arithmetic. `new(T)` allocates a zero `T`, escape
+      analysis keeps returned locals alive, and field selectors
+      dereference pointers automatically.
+
+  - id: append-not-visible
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func add(s []int) {
+          s = append(s, 4)
+      }
+
+      func main() {
+          s := make([]int, 3, 10)
+          add(s)
+          fmt.Println(len(s), s)
+      }
+    answer: "3 [0 0 0]"
+    explanation: >-
+      The function receives a copy of the slice header. Its `append`
+      changes only the local length, so the caller still sees length 3.
+      The caller would need `s = add(s)` with a returned slice.
+
+  - id: loop-var-pointers
+    type: output
+    prompt: >-
+      This module's `go.mod` declares `go 1.22`. What does the program
+      print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          var ptrs []*int
+          for i := 0; i < 3; i++ {
+              ptrs = append(ptrs, &i)
+          }
+          for _, p := range ptrs {
+              fmt.Print(*p, " ")
+          }
+          fmt.Println()
+      }
+    answer: "0 1 2"
+    explanation: >-
+      Since Go 1.22 each iteration has its own copy of the loop variable,
+      so each pointer refers to a different `i`. Before 1.22 all three
+      pointers shared one variable and the output was `3 3 3`.
+
+  - id: pointer-param-fill
+    type: fill
+    prompt: Fill in the gaps so the function increments the caller's variable and the program prints `6`.
+    code: |
+      package main
+
+      import "fmt"
+
+      func inc(n ___) {
+          ___++
+      }
+
+      func main() {
+          x := 5
+          inc(&x)
+          fmt.Println(x)
+      }
+    answer: ["*int", "*n"]
+    explanation: >-
+      The parameter type is `*int`, and `*n++` increments the integer the
+      pointer refers to. Without the dereference, `n++` would not compile
+      for a pointer.
+
+  - id: map-element-address-bug
+    type: bug
+    prompt: This program does not compile. Which line is the problem?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          m := map[string]int{"a": 1}
+          p := &m["a"]
+          fmt.Println(*p)
+      }
+    answer: 7
+    explanation: >-
+      Map elements are not addressable, because the runtime may move them
+      when the map grows. Copy the value to a variable (`v := m["a"]`) and
+      take its address, or store pointers in the map.
+
+  - id: escape-flag
+    type: single
+    prompt: Which command prints the compiler's escape analysis decisions?
+    options:
+      - "`go vet -escape ./...`"
+      - "`go build -gcflags=-m ./...`"
+      - "`go run -race main.go`"
+      - "`go env -m`"
+    answer: 1
+    explanation: >-
+      `-gcflags=-m` asks the compiler to print optimisation decisions such
+      as `moved to heap: x` and `escapes to heap`.
+
+  - id: range-copy
+    type: single
+    prompt: >-
+      `items` is a `[]Counter` where `Counter` is a struct with field `N`.
+      After `for _, it := range items { it.N++ }`, what has happened to the
+      elements of `items`?
+    options:
+      - "Every element's `N` was incremented"
+      - "Nothing changed, because `it` is a copy of each element"
+      - "It panics, since range values are read-only"
+      - "Only the last element changed"
+    answer: 1
+    explanation: >-
+      Ranging over a slice of structs yields a copy of each element. Use
+      `items[i].N++` or a slice of pointers (`[]*Counter`) to modify the
+      originals.

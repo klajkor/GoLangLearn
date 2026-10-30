@@ -1,0 +1,114 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+
+  /* Go brand cyan */
+  --color-gopher-50: #e6f8fc;
+  --color-gopher-100: #c2eef8;
+  --color-gopher-300: #5cd0ea;
+  --color-gopher-400: #29c1e2;
+  --color-gopher-500: #007c9d; /* white text on this passes AA */
+  --color-gopher-600: #008fb3;
+  --color-gopher-700: #00708c;
+}
+
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-slate-50 text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-200;
+}
+
+/* Go syntax colours shared by CodeBlock and the Playground editor
+   (token classes come from @lezer/highlight's classHighlighter). */
+.code-theme {
+  color: #abb2bf;
+}
+.code-theme .tok-keyword { color: #d594e8; }
+.code-theme .tok-string,
+.code-theme .tok-string2 { color: #98c379; }
+.code-theme .tok-number,
+.code-theme .tok-bool,
+.code-theme .tok-atom { color: #d19a66; }
+.code-theme .tok-comment { color: #7f848e; font-style: italic; }
+.code-theme .tok-typeName,
+.code-theme .tok-className,
+.code-theme .tok-namespace { color: #e5c07b; }
+.code-theme .tok-variableName.tok-definition { color: #61afef; }
+.code-theme .tok-propertyName { color: #56d4ef; }
+.code-theme .tok-operator { color: #56b6c2; }
+.code-theme .tok-punctuation { color: #abb2bf; }
+.code-theme .tok-invalid { color: #e06c75; }
+
+/* Reward animations. Disabled for people who prefer reduced motion. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  70% {
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes confetti-fall {
+  to {
+    top: 105%;
+    opacity: 0.9;
+    translate: 40px 0;
+    rotate: 540deg;
+  }
+}
+.toast-in {
+  animation: toast-in 0.25s ease-out;
+}
+.pop-in {
+  animation: pop-in 0.4s ease-out;
+}
+.confetti {
+  animation: confetti-fall linear forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast-in,
+  .pop-in,
+  .confetti {
+    animation: none;
+  }
+  .confetti {
+    display: none;
+  }
+}
+
+/* Accessible text colours: Tailwind's default light-mode slate-400/500 and
+   the cyan accent fall below WCAG AA (4.5:1) for small text on white or on
+   tinted cards, so darken them in light mode. */
+:root:not(.dark) {
+  --color-slate-400: #5f6e84;
+  --color-slate-500: #4f5e75;
+  --color-gopher-600: #006b86;
+}
+.dark {
+  --color-slate-500: #8a99ae;
+}

@@ -1,0 +1,145 @@
+passPercent: 70
+questions:
+  - id: exported-identifier
+    type: single
+    prompt: "Which declaration in package `shop` can be used from other packages?"
+    options:
+      - "`func total(items []Item) int`"
+      - "`var discount = 10`"
+      - "`type Cart struct{}`"
+      - "`const _max = 5`"
+    answer: 2
+    explanation: >-
+      Only identifiers that start with an upper-case letter are exported.
+      `Cart` is exported; `total`, `discount` and `_max` all begin with a
+      lower-case letter or underscore and stay private to the package.
+
+  - id: go-mod-tidy
+    type: multi
+    prompt: What does `go mod tidy` do? Select all that apply.
+    options:
+      - "Adds missing requirements for imports used in your code"
+      - "Removes requirements that nothing imports any more"
+      - "Updates every dependency to its newest major version"
+      - "Updates `go.sum` to match the build"
+    answer: [0, 1, 3]
+    explanation: >-
+      `go mod tidy` synchronises `go.mod` and `go.sum` with the imports in
+      your code, adding and removing as needed. It never jumps to a new
+      major version; that needs a new import path (`/v2`) and an explicit
+      `go get`.
+
+  - id: init-order-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      var x = initX()
+
+      func initX() int {
+          fmt.Println("var")
+          return 1
+      }
+
+      func init() {
+          fmt.Println("init")
+      }
+
+      func main() {
+          fmt.Println("main", x)
+      }
+    answer: |
+      var
+      init
+      main 1
+    explanation: >-
+      Package-level variables are initialised first, then `init()` runs,
+      and finally `main`.
+
+  - id: alias-fill
+    type: fill
+    prompt: Fill in the gap so the program imports `strings` under the alias `s` and prints `GO`.
+    code: |
+      package main
+
+      import (
+          "fmt"
+          ___ "strings"
+      )
+
+      func main() {
+          fmt.Println(s.ToUpper("go"))
+      }
+    answer: [s]
+    explanation: >-
+      An import alias is written before the path: `s "strings"`. After that
+      the package is referred to as `s`, and the name `strings` is not
+      available in this file.
+
+  - id: unused-import-bug
+    type: bug
+    prompt: This program does not compile. Which line is the problem?
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "os"
+      )
+
+      func main() {
+          fmt.Println("hello")
+      }
+    answer: 5
+    explanation: >-
+      `"os"` is imported but never used, which is a compile error in Go:
+      `"os" imported and not used`.
+
+  - id: v2-import-path
+    type: single
+    prompt: >-
+      A library released `v2.0.0` with breaking changes. How should its
+      module path and imports look?
+    options:
+      - "The same path as v1; the tag `v2.0.0` is enough"
+      - "The path ends in `/v2`, for example `github.com/you/lib/v2`"
+      - "The path ends in `.v2` only when published through a proxy"
+      - "The path must contain the full version, such as `lib/v2.0.0`"
+    answer: 1
+    explanation: >-
+      The import compatibility rule says the same import path must remain
+      backward compatible, so a breaking release uses a new path ending in
+      `/v2` (or `/v3`, and so on). `v0` and `v1` have no suffix.
+
+  - id: internal-dir
+    type: single
+    prompt: >-
+      Your module is `example.com/app` and contains `internal/store`. Who may
+      import `example.com/app/internal/store`?
+    options:
+      - "Any module that depends on `example.com/app`"
+      - "Only packages whose path is rooted at `example.com/app/`"
+      - "Only the `main` package"
+      - "Only packages in the same directory"
+    answer: 1
+    explanation: >-
+      The compiler enforces that an `internal` package can be imported only
+      by code in the tree rooted at the parent of the `internal` directory.
+      Here that parent is `example.com/app`.
+
+  - id: go-sum-role
+    type: single
+    prompt: What is `go.sum` for?
+    options:
+      - "It lists the direct dependencies you chose"
+      - "It pins the Go toolchain version"
+      - "It stores hashes used to verify downloaded module contents"
+      - "It records which packages are exported"
+    answer: 2
+    explanation: >-
+      `go.sum` contains cryptographic hashes of module versions so Go can
+      detect altered code. Direct requirements live in `go.mod`. You commit
+      `go.sum` but do not edit it by hand.

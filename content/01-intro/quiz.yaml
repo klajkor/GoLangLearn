@@ -1,0 +1,135 @@
+# Chapter 1 quiz. Question types: single, multi, output, fill, bug.
+passPercent: 70
+questions:
+  - id: entry-point
+    type: single
+    prompt: Which declaration makes a Go file part of an executable program, with execution starting in `main`?
+    options:
+      - "`package app` with `func Main()`"
+      - "`package main` with `func main()`"
+      - "`package main` with `func init()` only"
+      - "`package program` with `func start()`"
+    answer: 1
+    explanation: >-
+      An executable needs `package main` and a `func main()` with no
+      parameters and no results. `init` runs before `main` but is not the
+      entry point.
+
+  - id: go-run-vs-build
+    type: single
+    prompt: What is the difference between `go run .` and `go build`?
+    options:
+      - "`go run .` only type-checks; `go build` runs the program"
+      - "`go build` is for libraries; `go run .` is for programs"
+      - "`go run .` compiles to a temporary binary and runs it; `go build` leaves an executable on disk"
+      - "They are identical except for speed"
+    answer: 2
+    explanation: >-
+      Both compile the package. `go run` executes the result from a temporary
+      location and cleans it up, while `go build` writes the executable into
+      the current directory (or where `-o` says).
+
+  - id: toolchain-commands
+    type: multi
+    prompt: Which of these are real parts of the standard `go` command? Select all that apply.
+    options:
+      - "`go fmt` rewrites code into the standard layout"
+      - "`go vet` reports suspicious constructs that still compile"
+      - "`go mod init` creates a `go.mod` file"
+      - "`go lint` is built in and enforces naming rules"
+    answer: [0, 1, 2]
+    explanation: >-
+      `go fmt`, `go vet` and `go mod init` all ship with Go. There is no
+      built-in `go lint`; linters such as `staticcheck` are separate tools.
+
+  - id: exported-names
+    type: multi
+    prompt: Seen from another package, which identifiers are exported? Select all that apply.
+    options:
+      - "`Println`"
+      - "`parseConfig`"
+      - "`HTTPServer`"
+      - "`_Hidden`"
+    answer: [0, 2]
+    explanation: >-
+      Only names that start with an uppercase letter are exported. `parseConfig`
+      starts with lowercase and `_Hidden` starts with an underscore, so neither
+      is visible outside its package.
+
+  - id: println-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          fmt.Println("go", "is", 1)
+          fmt.Print("a", "b")
+          fmt.Print(1, 2)
+          fmt.Println()
+      }
+    answer: |
+      go is 1
+      ab1 2
+    explanation: >-
+      `Println` separates its operands with spaces and ends with a newline.
+      `Print` adds spaces only between operands when neither is a string, so
+      `"a", "b"` gives `ab` while `1, 2` gives `1 2`. The final `Println()`
+      ends the line.
+
+  - id: printf-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "strings"
+      )
+
+      func main() {
+          s := strings.Repeat("go", 2)
+          fmt.Printf("%s has %d bytes\n", strings.ToUpper(s), len(s))
+      }
+    answer: GOGO has 4 bytes
+    explanation: >-
+      `Repeat` yields `"gogo"`, `ToUpper` makes it `GOGO`, and `len` counts
+      its 4 bytes. `%s` and `%d` consume the two arguments in order.
+
+  - id: module-fill
+    type: fill
+    prompt: Fill in the gaps so the program is a valid executable that prints `hi`.
+    code: |
+      ___ main
+
+      import "fmt"
+
+      func ___() {
+          fmt.Println("hi")
+      }
+    answer: [package, main]
+    explanation: >-
+      A file starts with a `package` clause, and for an executable the package
+      is `main`, with an entry function also named `main`.
+
+  - id: unused-import-bug
+    type: bug
+    prompt: This program does not compile. Which line is the problem?
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "os"
+      )
+
+      func main() {
+          fmt.Println("hello")
+      }
+    answer: 5
+    explanation: >-
+      Go rejects unused imports: `"os" imported and not used`. Remove the
+      import or use something from the package.

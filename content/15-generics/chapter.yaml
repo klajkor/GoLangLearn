@@ -1,0 +1,4 @@
+title: Generics
+tier: advanced
+icon: "🧬"
+summary: Type parameters, constraints and when generics pay off.

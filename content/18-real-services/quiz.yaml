@@ -1,0 +1,194 @@
+passPercent: 70
+questions:
+  - id: default-client
+    type: single
+    prompt: Why is calling `http.Get(url)` in production code considered risky?
+    options:
+      - "It uses `http.DefaultClient`, which has no timeout, so a silent server can block the goroutine forever."
+      - "It cannot follow redirects."
+      - "It only supports the `GET` method over plain HTTP, not HTTPS."
+      - "It reads the whole response body into memory and closes it for you, which is slow."
+    answer: 0
+    explanation: >-
+      `http.DefaultClient` has a zero `Timeout`, meaning no limit. Build your
+      own `http.Client` with a `Timeout` and use `NewRequestWithContext` so
+      calls can be cancelled. `http.Get` does follow redirects and supports
+      HTTPS, and it does not close the body for you.
+
+  - id: json-tag-facts
+    type: multi
+    prompt: Which statements about `encoding/json` are true? Select all that apply.
+    options:
+      - "A field tagged `json:\"age,omitempty\"` is left out of the output when `Age` is `0`."
+      - "Unexported struct fields are encoded using their lower-case names."
+      - "After `dec.DisallowUnknownFields()`, decoding a JSON object with an unrecognized key returns an error."
+      - "A field tagged `json:\"-\"` is neither encoded nor decoded."
+    answer: [0, 2, 3]
+    explanation: >-
+      `omitempty` drops zero values such as `0`, `""`, `nil` and empty
+      collections. The `-` tag ignores a field completely, and
+      `DisallowUnknownFields` turns unknown keys into errors. Unexported
+      fields are invisible to `encoding/json` because it uses reflection and
+      cannot access them.
+
+  - id: middleware-order
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "net/http"
+          "net/http/httptest"
+      )
+
+      func tag(name string) func(http.Handler) http.Handler {
+          return func(next http.Handler) http.Handler {
+              return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+                  fmt.Println("before", name)
+                  next.ServeHTTP(w, r)
+                  fmt.Println("after", name)
+              })
+          }
+      }
+
+      func main() {
+          final := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+              fmt.Println("handler")
+          })
+          h := tag("A")(tag("B")(final))
+          h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
+      }
+    answer: |
+      before A
+      before B
+      handler
+      after B
+      after A
+    explanation: >-
+      The outermost middleware (`A`) runs its "before" code first and its
+      "after" code last; the wrapped handlers nest like function calls.
+
+  - id: mux-status-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "net/http"
+          "net/http/httptest"
+      )
+
+      func main() {
+          mux := http.NewServeMux()
+          mux.HandleFunc("GET /u/{id}", func(w http.ResponseWriter, r *http.Request) {
+              fmt.Println("id =", r.PathValue("id"))
+          })
+
+          var codes []int
+          for _, c := range [][2]string{{"GET", "/u/5"}, {"POST", "/u/5"}, {"GET", "/x"}} {
+              rec := httptest.NewRecorder()
+              mux.ServeHTTP(rec, httptest.NewRequest(c[0], c[1], nil))
+              codes = append(codes, rec.Code)
+          }
+          fmt.Println(codes)
+      }
+    answer: |
+      id = 5
+      [200 405 404]
+    explanation: >-
+      The first request matches and the handler prints the wildcard value, and
+      the implicit status is 200. The `POST` request matches the path but not
+      the method, so the mux answers `405 Method Not Allowed`. An unknown path
+      gives `404`.
+
+  - id: shutdown-fill
+    type: fill
+    prompt: Fill in the gaps to build a context that is cancelled on Ctrl+C and to stop the server gracefully.
+    code: |
+      package main
+
+      import (
+          "context"
+          "fmt"
+          "net/http"
+          "os"
+          "os/signal"
+      )
+
+      func main() {
+          ctx, stop := signal.___(context.Background(), os.Interrupt)
+          defer stop()
+
+          srv := &http.Server{Addr: ":8080"}
+          // ... start srv.ListenAndServe() in a goroutine, then wait for ctx.Done() ...
+          if err := srv.___(ctx); err != nil {
+              fmt.Println("error:", err)
+          }
+          fmt.Println("done")
+      }
+    answer: ["NotifyContext", "Shutdown"]
+    explanation: >-
+      `signal.NotifyContext` returns a context that is cancelled when one of
+      the signals arrives. `Server.Shutdown(ctx)` stops accepting connections
+      and waits for in-flight requests to finish (up to the context's
+      deadline).
+
+  - id: body-close-bug
+    type: bug
+    prompt: This helper can panic with a nil pointer dereference when the request fails. Which line contains the bug?
+    code: |
+      package main
+
+      import "net/http"
+
+      func status(c *http.Client, url string) (int, error) {
+          resp, err := c.Get(url)
+          defer resp.Body.Close()
+          if err != nil {
+              return 0, err
+          }
+          return resp.StatusCode, nil
+      }
+
+      func main() {
+          _ = status
+      }
+    answer: 7
+    explanation: >-
+      When `Get` fails, `resp` is `nil`, so evaluating `resp.Body` in the
+      `defer` statement panics. Check `err` first and defer the `Close` only
+      after the request succeeded.
+
+  - id: internal-dir
+    type: single
+    prompt: What is the effect of putting a package under an `internal/` directory?
+    options:
+      - "It is compiled with extra optimizations."
+      - "Only code inside the parent of `internal/` (and its subtree) can import it; the compiler rejects other imports."
+      - "It is excluded from `go test` runs."
+      - "It can only be imported by `package main`."
+    answer: 1
+    explanation: >-
+      `internal/` is enforced by the `go` tool: packages elsewhere cannot
+      import it. This lets you keep implementation details private within a
+      module without risking outside dependents.
+
+  - id: service-facts
+    type: multi
+    prompt: Which statements about building services are true? Select all that apply.
+    options:
+      - "After `srv.Shutdown(ctx)` is called, `srv.ListenAndServe()` returns `http.ErrServerClosed`."
+      - "`sql.Open` always connects to the database immediately and fails if it is unreachable."
+      - "A `*sql.DB` is a connection pool that is safe for concurrent use, so you create it once and share it."
+      - "With Go 1.22 patterns, a request for a registered path with an unregistered method receives `405 Method Not Allowed`."
+    answer: [0, 2, 3]
+    explanation: >-
+      `ErrServerClosed` is the normal result of a graceful shutdown and should
+      not be treated as a failure. `sql.Open` only validates its arguments and
+      prepares the pool; use `PingContext` to verify connectivity.
+      `*sql.DB` is designed to be long-lived and shared. The Go 1.22 `ServeMux`
+      replies with 405 (and an `Allow` header) when only the method is wrong.

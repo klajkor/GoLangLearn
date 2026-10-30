@@ -1,0 +1,4 @@
+title: Arrays, Slices & Maps
+tier: beginner
+icon: "🗂️"
+summary: Go's core collections and how slices really work under the hood.

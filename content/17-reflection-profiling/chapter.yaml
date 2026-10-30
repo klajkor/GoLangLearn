@@ -1,0 +1,4 @@
+title: Reflection, unsafe & Profiling
+tier: expert
+icon: "🔬"
+summary: The reflect package, unsafe, and finding hot spots with pprof.

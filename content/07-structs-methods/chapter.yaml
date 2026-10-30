@@ -1,0 +1,4 @@
+title: Structs & Methods
+tier: intermediate
+icon: "🏗️"
+summary: Modelling data with structs, embedding and value vs pointer receivers.

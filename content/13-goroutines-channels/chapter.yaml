@@ -1,0 +1,4 @@
+title: Goroutines & Channels
+tier: advanced
+icon: "🧵"
+summary: Lightweight concurrency and communicating by sharing memory safely.

@@ -1,0 +1,194 @@
+passPercent: 70
+questions:
+  - id: who-closes-results
+    type: single
+    prompt: Four workers send to a shared `results` channel, and `main` reads it with `for r := range results`. Who should close `results`?
+    options:
+      - "A separate goroutine that calls `wg.Wait()` and then `close(results)`."
+      - "Each worker, when it finishes its last job."
+      - "`main`, right after it starts the workers."
+      - "Nobody; `range` stops by itself when the workers return."
+    answer: 0
+    explanation: >-
+      Only a goroutine that knows all senders are done may close. A worker
+      closing would make the others panic on send, closing too early has the
+      same effect, and without a close the `range` loop blocks forever (a
+      deadlock) even though the workers returned.
+
+  - id: pipeline-facts
+    type: multi
+    prompt: Which statements about pipelines and worker pools are true? Select all that apply.
+    options:
+      - "A pipeline stage should create, own and close its output channel."
+      - "Running several workers inside one stage still delivers items in input order."
+      - "Workers writing to different elements of a pre-sized slice do not need a mutex."
+      - "Any worker may safely close the shared results channel after its own last send."
+    answer: [0, 2]
+    explanation: >-
+      The sender side owns and closes its channel, and writes to distinct slice
+      elements are not a data race as long as a `WaitGroup` orders the final
+      read. With several workers items arrive in any order, and a worker
+      closing a shared channel makes its siblings panic on send.
+
+  - id: indexed-results-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "sync"
+      )
+
+      func main() {
+          results := make([]int, 4)
+          var wg sync.WaitGroup
+          for i := 0; i < 4; i++ {
+              wg.Add(1)
+              go func() {
+                  defer wg.Done()
+                  results[i] = i * i
+              }()
+          }
+          wg.Wait()
+          fmt.Println(results)
+      }
+    answer: "[0 1 4 9]"
+    explanation: >-
+      Each goroutine writes only its own slot, so the order in which the
+      goroutines run does not matter. (Since Go 1.22 every loop iteration has
+      its own `i`.) After `wg.Wait()` the slice is complete and in input order.
+
+  - id: pipeline-sum-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func gen(n int) <-chan int {
+          out := make(chan int)
+          go func() {
+              defer close(out)
+              for i := 1; i <= n; i++ {
+                  out <- i
+              }
+          }()
+          return out
+      }
+
+      func double(in <-chan int) <-chan int {
+          out := make(chan int)
+          go func() {
+              defer close(out)
+              for v := range in {
+                  out <- v * 2
+              }
+          }()
+          return out
+      }
+
+      func main() {
+          sum := 0
+          for v := range double(gen(4)) {
+              sum += v
+          }
+          fmt.Println(sum)
+      }
+    answer: "20"
+    explanation: >-
+      `gen(4)` produces 1, 2, 3, 4, the `double` stage turns them into 2, 4, 6,
+      8, and the loop adds them up: 20. Each stage closes its output when its
+      input is exhausted, which ends the `range` loops down the chain.
+
+  - id: semaphore-fill
+    type: fill
+    prompt: Fill in the gaps so that at most two tasks run at once and the program prints `done 5`.
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "sync"
+          "sync/atomic"
+      )
+
+      func main() {
+          sem := make(chan struct{}, 2)
+          var wg sync.WaitGroup
+          var finished atomic.Int32
+
+          for i := 0; i < 5; i++ {
+              wg.Add(1)
+              go func() {
+                  defer wg.Done()
+                  sem <- ___
+                  defer func() { <-___ }()
+                  finished.Add(1)
+              }()
+          }
+          wg.Wait()
+          fmt.Println("done", finished.Load())
+      }
+    answer: ["struct{}{}", "sem"]
+    explanation: >-
+      A send on the buffered channel acquires a slot (it blocks when two are
+      taken) and a receive from the same channel releases it. The empty struct
+      `struct{}{}` carries no data, only the count matters.
+
+  - id: leak-bug
+    type: bug
+    prompt: >-
+      `firstReply` should return as soon as one goroutine answers, but it leaks
+      `n-1` goroutines. Which line should change to fix it with a minimal edit?
+    code: |
+      package main
+
+      import "fmt"
+
+      func firstReply(n int) int {
+          ch := make(chan int)
+          for i := 0; i < n; i++ {
+              go func() { ch <- i }()
+          }
+          return <-ch
+      }
+
+      func main() {
+          fmt.Println(firstReply(3) >= 0)
+      }
+    answer: 6
+    explanation: >-
+      The channel is unbuffered, so after the first value is received the
+      other senders block forever. Making it buffered for every sender,
+      `make(chan int, n)`, lets them deposit their value and exit.
+
+  - id: when-not-concurrent
+    type: single
+    prompt: In which situation is adding goroutines LEAST likely to help?
+    options:
+      - "Squaring 20 numbers in memory, where each step takes a few nanoseconds."
+      - "Fetching 200 URLs where each request waits on the network."
+      - "Resizing many large images on a multi-core machine."
+      - "Calling several independent microservices and combining their answers."
+    answer: 0
+    explanation: >-
+      Goroutine start-up and channel hand-offs cost far more than the work
+      itself, so a simple loop is faster and clearer. The other cases are I/O
+      bound or heavy CPU work on independent items, where concurrency pays off.
+
+  - id: leak-causes
+    type: multi
+    prompt: Which statements about goroutine leaks are true? Select all that apply.
+    options:
+      - "A goroutine blocked on a send nobody will ever receive is leaked."
+      - "A goroutine ranging over a channel that is never closed can be leaked."
+      - "The garbage collector reclaims goroutines that are blocked forever."
+      - "A channel buffered for all senders lets losing senders finish instead of blocking."
+    answer: [0, 1, 3]
+    explanation: >-
+      Blocked goroutines stay alive; the garbage collector does not stop them,
+      so you must give every goroutine a way to finish (close the channel,
+      cancel a context, or provide buffer space).

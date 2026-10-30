@@ -1,0 +1,4 @@
+title: Building Real Services
+tier: expert
+icon: "🌐"
+summary: net/http, JSON APIs, project layout and idiomatic Go in production.

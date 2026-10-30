@@ -1,0 +1,4 @@
+title: Pointers & Memory Basics
+tier: intermediate
+icon: "👉"
+summary: Pointers, escape analysis basics, and when to share vs copy.

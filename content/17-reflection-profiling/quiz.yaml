@@ -1,0 +1,161 @@
+passPercent: 70
+questions:
+  - id: flat-vs-cum
+    type: single
+    prompt: In `go tool pprof`'s `top` output, function `f` has a small `flat` value but a large `cum` value. What does that mean?
+    options:
+      - "`f` itself is cheap, but the functions it calls spend a lot of time."
+      - "`f` spends most of its time in its own code."
+      - "`f` was called very few times."
+      - "`f` is blocked on a mutex."
+    answer: 0
+    explanation: >-
+      `flat` is time spent in the function's own code; `cum` includes
+      everything it calls. A large `cum` with a small `flat` tells you to look
+      at the callees (use `list` or the flame graph) rather than at `f`.
+
+  - id: reflect-facts
+    type: multi
+    prompt: Which statements about the `reflect` package are true? Select all that apply.
+    options:
+      - "For `type MyInt int`, `reflect.TypeOf(MyInt(1)).Kind()` is `reflect.Int`."
+      - "`reflect.ValueOf(x).Field(0).CanSet()` is true for an exported field of a struct `x` passed by value."
+      - "`reflect.DeepEqual([]int(nil), []int{})` returns `false`."
+      - "`reflect.ValueOf(&x).Elem()` gives an addressable value whose exported fields can be set."
+    answer: [0, 2, 3]
+    explanation: >-
+      `Kind` is the underlying category, so `MyInt` has kind `int`. A struct
+      passed by value is copied into the `Value` and is not addressable, so
+      `CanSet` is false; you must go through a pointer and `Elem()`. `DeepEqual`
+      distinguishes a nil slice from an empty one.
+
+  - id: kind-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "reflect"
+      )
+
+      type Celsius float64
+
+      func main() {
+          t := reflect.TypeOf(Celsius(36.6))
+          fmt.Println(t.Name(), t.Kind(), t.Kind() == reflect.Float64)
+      }
+    answer: "Celsius float64 true"
+    explanation: >-
+      `Name()` is the defined type's name, while `Kind()` reports the
+      underlying category, which is `float64` for `Celsius`.
+
+  - id: padding-output
+    type: output
+    prompt: |
+      What does this program print on a 64-bit platform?
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "unsafe"
+      )
+
+      type A struct {
+          x bool
+          y int32
+          z bool
+      }
+
+      type B struct {
+          y int32
+          x bool
+          z bool
+      }
+
+      func main() {
+          fmt.Println(unsafe.Sizeof(A{}), unsafe.Sizeof(B{}))
+      }
+    answer: "12 8"
+    explanation: >-
+      In `A`, `x` is followed by 3 padding bytes so that `y` is 4-byte
+      aligned, and `z` is followed by 3 trailing padding bytes: 1+3+4+1+3 = 12.
+      In `B`, `y` takes 4 bytes and `x` and `z` fit together in the next 4
+      (including 2 padding bytes), giving 8.
+
+  - id: elem-fill
+    type: fill
+    prompt: Fill in the gaps so that the program prints `42`.
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "reflect"
+      )
+
+      func main() {
+          n := 1
+          v := reflect.ValueOf(&n).___()
+          v.___(42)
+          fmt.Println(n)
+      }
+    answer: ["Elem", "SetInt"]
+    explanation: >-
+      `ValueOf(&n)` is a pointer; `Elem()` dereferences it to an addressable,
+      settable `Value`, and `SetInt` writes an integer into it.
+
+  - id: unaddressable-bug
+    type: bug
+    prompt: This program panics at run time with "using unaddressable value". Which line contains the bug?
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "reflect"
+      )
+
+      func main() {
+          x := 1
+          v := reflect.ValueOf(x)
+          v.SetInt(2)
+          fmt.Println(x)
+      }
+    answer: 10
+    explanation: >-
+      `ValueOf(x)` holds a copy of `x`, which cannot be set. The fix is
+      `reflect.ValueOf(&x).Elem()`, which refers to the original variable.
+
+  - id: gc-knobs
+    type: single
+    prompt: A service runs in a container limited to 1 GiB. Which setting best helps the garbage collector work harder as memory approaches the limit, before the OOM killer acts?
+    options:
+      - "`GOGC=off`"
+      - "`GOMEMLIMIT=900MiB`"
+      - "`GOMAXPROCS=1`"
+      - "`GODEBUG=gctrace=1`"
+    answer: 1
+    explanation: >-
+      `GOMEMLIMIT` (Go 1.19+) is a soft memory cap that makes the collector
+      more aggressive near the limit. `GOGC=off` would remove the heap-growth
+      trigger, `GOMAXPROCS` limits parallelism, and `gctrace` merely prints GC
+      information.
+
+  - id: profiling-facts
+    type: multi
+    prompt: Which statements about profiling and `unsafe` are true? Select all that apply.
+    options:
+      - "Block and mutex profiles record nothing until you enable them with `runtime.SetBlockProfileRate` or `runtime.SetMutexProfileFraction`."
+      - "Importing `net/http/pprof` for its side effect registers handlers under `/debug/pprof/` on `http.DefaultServeMux`."
+      - "A `uintptr` obtained from an `unsafe.Pointer` keeps the pointed-to object alive."
+      - "`go build -gcflags=-m` reports which variables escape to the heap."
+    answer: [0, 1, 3]
+    explanation: >-
+      Block and mutex profiling are off by default, and the blank import of
+      `net/http/pprof` registers its handlers on the default mux (so keep them
+      off public listeners). `-gcflags=-m` prints escape analysis decisions. A
+      `uintptr` is only an integer: the garbage collector ignores it, so the
+      object can be freed or moved.

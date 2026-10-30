@@ -1,0 +1,172 @@
+passPercent: 70
+questions:
+  - id: waitgroup-add
+    type: single
+    prompt: Where should `wg.Add(1)` normally be called relative to the `go` statement it accounts for?
+    options:
+      - "In the calling goroutine, before the `go` statement."
+      - "As the first line inside the new goroutine."
+      - "After `wg.Wait()` returns."
+      - "It does not matter; the order is irrelevant."
+    answer: 0
+    explanation: >-
+      If `Add` ran inside the new goroutine, `wg.Wait()` in the caller could
+      execute first, see a zero counter, and return before the work started.
+      Calling `Add` before `go` makes the count correct by the time `Wait`
+      runs.
+
+  - id: mutex-facts
+    type: multi
+    prompt: Which statements about `sync.Mutex` and `sync.RWMutex` are true? Select all that apply.
+    options:
+      - "Locking a `sync.Mutex` twice from the same goroutine without unlocking deadlocks."
+      - "Copying a `sync.Mutex` after it has been used is safe, because it is a small struct."
+      - "Many goroutines may hold `RLock` on an `RWMutex` at the same time."
+      - "Reads of guarded data do not need the lock if only one goroutine writes."
+    answer: [0, 2]
+    explanation: >-
+      Go mutexes are not reentrant, so a second `Lock` waits forever. An
+      `RWMutex` allows many simultaneous readers. A copied mutex duplicates
+      its state and no longer protects anything, and a read concurrent with a
+      write is still a data race, so readers must lock too.
+
+  - id: once-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "sync"
+      )
+
+      func main() {
+          var once sync.Once
+          for i := 0; i < 3; i++ {
+              once.Do(func() {
+                  fmt.Println("init", i)
+              })
+          }
+          fmt.Println("end")
+      }
+    answer: |
+      init 0
+      end
+    explanation: >-
+      `Once.Do` runs its function only for the first call, no matter what
+      function is passed later. The first iteration has `i == 0`, so that is
+      the only "init" line.
+
+  - id: select-default-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          ch := make(chan int, 1)
+          for i := 0; i < 3; i++ {
+              select {
+              case ch <- i:
+                  fmt.Println("sent", i)
+              default:
+                  fmt.Println("full", i)
+              }
+          }
+      }
+    answer: |
+      sent 0
+      full 1
+      full 2
+    explanation: >-
+      The buffer holds one value. The first send succeeds. Nobody receives, so
+      the channel stays full and the send cases can never proceed; `default`
+      runs instead of blocking.
+
+  - id: context-fill
+    type: fill
+    prompt: Fill in the gaps so the program prints `context deadline exceeded`.
+    code: |
+      package main
+
+      import (
+          "context"
+          "fmt"
+          "time"
+      )
+
+      func main() {
+          ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+          defer ___()
+          <-ctx.___()
+          fmt.Println(ctx.___())
+      }
+    answer: ["cancel", "Done", "Err"]
+    explanation: >-
+      Always `defer cancel()` to release the context's resources. `ctx.Done()`
+      returns a channel that is closed on timeout or cancellation, and
+      `ctx.Err()` then reports why: here `context.DeadlineExceeded`, whose
+      message is "context deadline exceeded".
+
+  - id: waitgroup-add-bug
+    type: bug
+    prompt: This program sometimes prints `[0 0 0]` instead of `[0 2 4]`. Which line contains the bug?
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "sync"
+      )
+
+      func main() {
+          var wg sync.WaitGroup
+          results := make([]int, 3)
+          for i := range results {
+              go func() {
+                  wg.Add(1)
+                  defer wg.Done()
+                  results[i] = i * 2
+              }()
+          }
+          wg.Wait()
+          fmt.Println(results)
+      }
+    answer: 13
+    explanation: >-
+      `wg.Add(1)` runs inside the goroutine, so `wg.Wait()` can see a counter
+      of zero and return before any goroutine has started. Call `Add` before
+      the `go` statement (or use `wg.Go` on Go 1.25+).
+
+  - id: nil-select
+    type: single
+    prompt: |
+      In a `select`, what happens to a case that receives from a `nil` channel?
+    options:
+      - "It is never chosen, because a nil channel is never ready."
+      - "It is chosen immediately and yields the zero value."
+      - "The `select` panics at run time."
+      - "The compiler reports an error."
+    answer: 0
+    explanation: >-
+      A nil channel blocks forever, so its case can never proceed. Setting a
+      channel variable to `nil` after it is closed is the standard way to stop
+      selecting on it while other cases continue to work.
+
+  - id: context-rules
+    type: single
+    prompt: Which is the recommended way to use a `context.Context` in your own API?
+    options:
+      - "Store it as a field in your struct so every method can use it."
+      - "Pass it as the first parameter, named `ctx`, and `defer cancel()` wherever you create a derived one."
+      - "Use `context.WithValue` to pass optional function arguments such as page size."
+      - "Pass `nil` when you have no context to give."
+    answer: 1
+    explanation: >-
+      `ctx` goes first in the parameter list and flows down the call chain.
+      Contexts are not stored in structs, `WithValue` is only for
+      request-scoped data crossing API boundaries (not optional arguments),
+      and `nil` must never be passed: use `context.TODO()` if unsure.

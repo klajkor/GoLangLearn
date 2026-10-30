@@ -1,0 +1,181 @@
+passPercent: 70
+questions:
+  - id: new-identity
+    type: single
+    prompt: |
+      What does this print?
+
+      ```go
+      e1 := errors.New("x")
+      e2 := errors.New("x")
+      fmt.Println(e1 == e2)
+      ```
+    options:
+      - "true, because the messages are equal"
+      - "false, because each call creates a distinct error value"
+      - "It does not compile; errors cannot be compared"
+      - "It depends on whether the strings are interned"
+    answer: 1
+    explanation: >-
+      `errors.New` returns a pointer to a fresh value each time, and errors
+      compare by identity. That is why sentinel errors are declared once as
+      package-level variables and compared (via `errors.Is`) against that
+      single value.
+
+  - id: errors-tools-facts
+    type: multi
+    prompt: Which statements are true? Select all that apply.
+    options:
+      - "`err == ErrNotFound` still works after the error was wrapped with `fmt.Errorf(\"...: %w\", err)`."
+      - "`errors.Join(nil, nil)` returns `nil`."
+      - "The second argument of `errors.As` should be a plain value, not a pointer."
+      - "`errors.Is(err, target)` finds `target` anywhere in a chain of `%w` wrappers."
+    answer: [1, 3]
+    explanation: >-
+      Wrapping creates a new error value, so `==` fails; `errors.Is` walks the
+      chain instead. `errors.Join` drops `nil` entries and returns `nil` if
+      nothing is left. `errors.As` needs a non-nil pointer to the target
+      variable so that it can set it.
+
+  - id: wrap-verb-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import (
+          "errors"
+          "fmt"
+      )
+
+      var ErrX = errors.New("x")
+
+      func main() {
+          err := fmt.Errorf("a: %w", ErrX)
+          err2 := fmt.Errorf("b: %v", err)
+          fmt.Println(err)
+          fmt.Println(errors.Is(err, ErrX), errors.Is(err2, ErrX))
+      }
+    answer: |
+      a: x
+      true false
+    explanation: >-
+      `%w` wraps, so `errors.Is(err, ErrX)` is `true`. `%v` only copies the
+      message text into a new error with no link to the original, so
+      `err2` no longer matches `ErrX`.
+
+  - id: recover-output
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func f() (n int) {
+          defer func() {
+              if r := recover(); r != nil {
+                  n = -1
+              }
+          }()
+          fmt.Println("f start")
+          panic("boom")
+      }
+
+      func main() {
+          fmt.Println(f())
+      }
+    answer: |
+      f start
+      -1
+    explanation: >-
+      `f` prints its first line, then panics. The deferred function recovers
+      and assigns to the named result `n`, so `f` returns `-1` normally and
+      `main` prints it. Without the named result, the deferred function could
+      not change the return value.
+
+  - id: is-as-fill
+    type: fill
+    prompt: Fill in the two gaps so that the program prints `true` twice.
+    code: |
+      package main
+
+      import (
+          "errors"
+          "fmt"
+      )
+
+      var ErrNotFound = errors.New("not found")
+
+      type VErr struct{ Field string }
+
+      func (*VErr) Error() string { return "invalid" }
+
+      func main() {
+          err := fmt.Errorf("wrap: %w", ErrNotFound)
+          fmt.Println(errors.___(err, ErrNotFound))
+
+          var ve *VErr
+          err = fmt.Errorf("w: %w", &VErr{Field: "age"})
+          fmt.Println(errors.___(err, &ve))
+      }
+    answer: ["Is", "As"]
+    explanation: >-
+      Use `errors.Is` to compare against a sentinel value, and `errors.As` to
+      find an error of a given type and capture it in a variable (note the
+      pointer `&ve`).
+
+  - id: wrap-verb-bug
+    type: bug
+    prompt: This program is meant to print `true` but prints `false`. Which line contains the bug?
+    code: |
+      package main
+
+      import (
+          "errors"
+          "fmt"
+      )
+
+      var ErrNotFound = errors.New("not found")
+
+      func load() error {
+          return fmt.Errorf("load: %v", ErrNotFound)
+      }
+
+      func main() {
+          fmt.Println(errors.Is(load(), ErrNotFound))
+      }
+    answer: 11
+    explanation: >-
+      `%v` formats the message but does not wrap the error, so the chain is
+      broken and `errors.Is` cannot find `ErrNotFound`. Use `%w` instead.
+
+  - id: when-to-panic
+    type: single
+    prompt: In which situation is calling `panic` most appropriate?
+    options:
+      - A user submits a form with an empty required field.
+      - A network request to an API times out.
+      - A configuration file is missing from disk.
+      - A function discovers that an internal invariant the program relies on is broken (a bug).
+    answer: 3
+    explanation: >-
+      Expected failures such as bad input, timeouts and missing files are
+      returned as errors. Panic is reserved for programmer errors and
+      impossible states, or for failures during start-up with `MustXxx`
+      helpers.
+
+  - id: recover-facts
+    type: multi
+    prompt: Which statements about `panic` and `recover` are true? Select all that apply.
+    options:
+      - "`recover()` returns `nil` when the goroutine is not panicking."
+      - "Deferred functions still run while a panic unwinds the stack."
+      - "`recover()` works when called from any helper function that the deferred function calls."
+      - "A named result lets a deferred function turn a recovered panic into a returned `error`."
+    answer: [0, 1, 3]
+    explanation: >-
+      `recover` returns `nil` if there is no panic, and deferred calls run
+      during unwinding. To be effective, `recover` must be called directly by
+      the deferred function, not by a helper it calls. Assigning to a named
+      `err` result is the standard way to convert the panic to an error.

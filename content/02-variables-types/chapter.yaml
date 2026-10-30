@@ -1,0 +1,4 @@
+title: Variables, Types & Constants
+tier: beginner
+icon: "📦"
+summary: Declaring values, Go's basic types, zero values and iota.

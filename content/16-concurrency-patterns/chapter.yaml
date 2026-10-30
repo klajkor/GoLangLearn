@@ -1,0 +1,4 @@
+title: Concurrency Patterns
+tier: advanced
+icon: "🏭"
+summary: Worker pools, pipelines, fan-in/fan-out and rate limiting.

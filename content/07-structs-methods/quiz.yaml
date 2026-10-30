@@ -1,0 +1,177 @@
+passPercent: 70
+questions:
+  - id: comparable-structs
+    type: single
+    prompt: Which of these struct types can NOT be compared with `==`?
+    options:
+      - "`struct{ X, Y int }`"
+      - "`struct{ Name string; Home struct{ City string } }`"
+      - "`struct{ ID int; Tags []string }`"
+      - "`struct{ P *int; OK bool }`"
+    answer: 2
+    explanation: >-
+      A struct is comparable only when all of its fields are comparable.
+      Slices (like `[]string`) are not, so comparing such structs does not
+      compile. Pointers, strings, ints and nested comparable structs are fine.
+
+  - id: receiver-facts
+    type: multi
+    prompt: Which statements about method receivers are true? Select all that apply.
+    options:
+      - A value receiver works on a copy of the value.
+      - A pointer receiver method can modify the fields of the caller's value.
+      - Methods can only be declared on struct types.
+      - If one method of a type needs a pointer receiver, it is best to use pointer receivers for all of its methods.
+    answer: [0, 1, 3]
+    explanation: >-
+      Value receivers get a copy; pointer receivers see the original.
+      Methods can be declared on any named type defined in the same package
+      (for example `type Celsius float64`), not just structs. Mixing receiver
+      kinds on one type is confusing, so be consistent.
+
+  - id: embedding-no-virtual
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      type Base struct{}
+
+      func (Base) Name() string { return "base" }
+
+      func (b Base) Greet() string { return "hi " + b.Name() }
+
+      type Child struct{ Base }
+
+      func (Child) Name() string { return "child" }
+
+      func main() {
+          c := Child{}
+          fmt.Println(c.Name())
+          fmt.Println(c.Greet())
+      }
+    answer: |
+      child
+      hi base
+    explanation: >-
+      `c.Name()` finds `Child.Name`, which shadows the promoted method. But
+      `Greet` is defined on `Base`, and inside it `b.Name()` is
+      `Base.Name`. Go has no virtual dispatch: embedding is delegation, not
+      inheritance.
+
+  - id: copy-vs-pointer
+    type: output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      type P struct{ X int }
+
+      func move(p P)     { p.X = 10 }
+      func movePtr(p *P) { p.X = 20 }
+
+      func main() {
+          a := P{1}
+          move(a)
+          fmt.Println(a.X)
+          movePtr(&a)
+          fmt.Println(a.X)
+          b := a
+          b.X = 5
+          fmt.Println(a.X, b.X)
+      }
+    answer: |
+      1
+      20
+      20 5
+    explanation: >-
+      `move` receives a copy, so `a.X` stays 1. `movePtr` changes the
+      original to 20. `b := a` copies the struct, so changing `b.X` leaves
+      `a.X` at 20.
+
+  - id: pointer-receiver-fill
+    type: fill
+    prompt: Fill in the gap so that the program prints `2`.
+    code: |
+      package main
+
+      import "fmt"
+
+      type Counter struct{ n int }
+
+      func (c ___ Counter) Inc() { c.n++ }
+
+      func main() {
+          var c Counter
+          c.Inc()
+          c.Inc()
+          fmt.Println(c.n)
+      }
+    answer: ["*"]
+    explanation: >-
+      With a value receiver, `Inc` increments a copy and the program would
+      print `0`. A pointer receiver `*Counter` modifies the original. The call
+      `c.Inc()` works because `c` is addressable, so Go takes `&c` for you.
+
+  - id: map-field-assign-bug
+    type: bug
+    prompt: This program does not compile. Which line contains the bug?
+    code: |
+      package main
+
+      import "fmt"
+
+      type User struct{ Age int }
+
+      func main() {
+          users := map[string]User{"ann": {Age: 30}}
+          users["ann"].Age = 31
+          fmt.Println(users["ann"])
+      }
+    answer: 9
+    explanation: >-
+      Map elements are not addressable, so you cannot assign to a field of a
+      struct stored in a map (`cannot assign to struct field users["ann"].Age
+      in map`). Copy the value out, modify it and store it back, or use
+      `map[string]*User`.
+
+  - id: stringer-pointer-receiver
+    type: single
+    prompt: |
+      Given this code, what does `fmt.Println(T{})` print?
+
+      ```go
+      type T struct{}
+
+      func (t *T) String() string { return "custom" }
+      ```
+    options:
+      - custom
+      - "{}"
+      - It does not compile
+      - "<nil>"
+    answer: 1
+    explanation: >-
+      `String` has a pointer receiver, so it is in the method set of `*T`
+      only. `Println` receives a plain `T` value, which is not a `fmt.Stringer`,
+      so the default struct formatting `{}` is used. `fmt.Println(&T{})` would
+      print `custom`.
+
+  - id: embedding-facts
+    type: multi
+    prompt: Given `type Dog struct{ Animal }`, which statements are true? Select all that apply.
+    options:
+      - Fields and methods of `Animal` are promoted to `Dog`.
+      - A `Dog` value can be passed to a function that takes an `Animal` parameter.
+      - "`d.Animal` refers to the embedded value explicitly."
+      - If `Dog` defines its own method with the same name as an `Animal` method, the `Dog` one is used for `d.Method()`.
+    answer: [0, 2, 3]
+    explanation: >-
+      Embedding promotes members, lets you reach the inner value by its type
+      name, and lets the outer type shadow promoted names. It does not create
+      a subtype relationship, so a `Dog` is not an `Animal` and cannot be
+      passed where an `Animal` is required (pass `d.Animal` instead).
